@@ -1,0 +1,337 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Library Book Inventory Manager</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: catalogue-card header, report strip, add form beside a searchable shelf table */
+:root {
+  --bg: #eceff0;
+  --surface: #ffffff;
+  --ink: #15242b;
+  --muted: #5d6e75;
+  --line: #d5dcdf;
+  --accent: #0e6a78;
+  --accent-ink: #ffffff;
+  --ok: #17794a;
+  --ok-bg: #dcf3e6;
+  --warn: #9a5a00;
+  --warn-bg: #fbecc9;
+  --bad: #b3261e;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1a1f; --surface: #172830; --ink: #e5eef0; --muted: #94a8af; --line: #2a404a;
+    --accent: #4fc3d4; --accent-ink: #062a31;
+    --ok: #62d596; --ok-bg: #12382a; --warn: #f0be5c; --warn-bg: #3d2f10; --bad: #ff8a80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1a1f; --surface: #172830; --ink: #e5eef0; --muted: #94a8af; --line: #2a404a;
+  --accent: #4fc3d4; --accent-ink: #062a31;
+  --ok: #62d596; --ok-bg: #12382a; --warn: #f0be5c; --warn-bg: #3d2f10; --bad: #ff8a80;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+
+header h1 {
+  font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.4rem);
+  letter-spacing: -0.02em; line-height: 1.1; margin: 0; text-wrap: balance;
+}
+header p { margin: 6px 0 0; color: var(--muted); }
+
+.report { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 16px; display: grid; gap: 2px;
+}
+.tile span { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tile strong { font-family: var(--font-display); font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile.ok strong { color: var(--ok); }
+.tile.warn strong { color: var(--warn); }
+
+.main { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 20px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 20px; min-width: 0; }
+.panel h2 { font-family: var(--font-display); font-size: 1.15rem; margin: 0 0 14px; }
+
+form { display: grid; gap: 12px; }
+label { display: grid; gap: 4px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+input, select {
+  width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px;
+}
+input::placeholder { color: var(--muted); opacity: 0.8; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+button { font: inherit; cursor: pointer; border-radius: 4px; border: 1px solid transparent; }
+.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; padding: 10px 14px; }
+.primary:hover { filter: brightness(1.08); }
+.ghost { background: none; color: var(--muted); border-color: var(--line); padding: 6px 12px; font-size: 0.85rem; }
+.ghost:hover { color: var(--ink); border-color: var(--muted); }
+
+.tools { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 10px; margin-bottom: 12px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.tab { background: none; border-color: var(--line); color: var(--muted); padding: 5px 14px; border-radius: 999px; font-size: 0.88rem; }
+.tab:hover { color: var(--ink); }
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 560px; }
+th { text-align: left; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 2px solid var(--line); }
+td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr.flash td { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, var(--accent) 22%, transparent); } to { background: transparent; } }
+.id { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); white-space: nowrap; }
+.title { font-weight: 600; }
+.actions { text-align: right; white-space: nowrap; }
+
+.pill { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+
+.act { padding: 5px 14px; font-weight: 600; font-size: 0.85rem; }
+.act.issue { background: var(--ok-bg); color: var(--ok); }
+.act.return { background: var(--warn-bg); color: var(--warn); }
+.act:hover { filter: brightness(0.95); }
+
+.empty { text-align: center; color: var(--muted); padding: 28px 0 8px; margin: 0; }
+.foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; color: var(--muted); font-size: 0.82rem; }
+
+#toast {
+  position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: var(--ink); color: var(--surface); padding: 10px 18px; border-radius: 6px;
+  max-width: calc(100vw - 32px); transition: opacity .2s, transform .2s; z-index: 20;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.error { background: var(--bad); color: #fff; }
+
+@media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .tools { grid-template-columns: minmax(0, 1fr); } .tile strong { font-size: 1.6rem; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Library Book Inventory Manager</h1>
+    <p>Add books, search by title or author, issue and return them. Changes are saved in this browser.</p>
+  </header>
+
+  <section class="report" aria-label="Library report">
+    <div class="tile"><span>Total books</span><strong id="r-total">0</strong></div>
+    <div class="tile ok"><span>Available</span><strong id="r-avail">0</strong></div>
+    <div class="tile warn"><span>Issued</span><strong id="r-issued">0</strong></div>
+  </section>
+
+  <div class="main">
+    <section class="panel" aria-labelledby="add-h">
+      <h2 id="add-h">Add a book</h2>
+      <form id="add-form" autocomplete="off">
+        <label for="f-id">Book ID<input id="f-id" placeholder="CS107"></label>
+        <label for="f-title">Title<input id="f-title" placeholder="Data Structures and Algorithms in Python"></label>
+        <label for="f-author">Author<input id="f-author" placeholder="Michael T. Goodrich"></label>
+        <button class="primary" type="submit">Add book</button>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="shelf-h">
+      <h2 id="shelf-h">Books</h2>
+      <div class="tools">
+        <input id="q" type="search" placeholder="Search books" aria-label="Search books">
+        <select id="field" aria-label="Search in">
+          <option value="title">Title</option>
+          <option value="author">Author</option>
+          <option value="all">Title, author or ID</option>
+        </select>
+      </div>
+      <div class="tabs" id="tabs">
+        <button class="tab" data-s="all" aria-pressed="true">All</button>
+        <button class="tab" data-s="available" aria-pressed="false">Available</button>
+        <button class="tab" data-s="issued" aria-pressed="false">Issued</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>ID</th><th>Title</th><th>Author</th><th>Status</th><th class="actions">Action</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p id="empty" class="empty" hidden>No books found.</p>
+      <div class="foot">
+        <span id="count"></span>
+        <button class="ghost" id="reset" type="button">Reset to sample books</button>
+      </div>
+    </section>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const KEY = "library-manager-books";
+const SAMPLE = [
+  ["CS101", "Introduction to Algorithms", "Thomas H. Cormen"],
+  ["CS102", "Operating System Concepts", "Abraham Silberschatz"],
+  ["CS103", "Computer Networking", "James Kurose"],
+  ["CS104", "Database System Concepts", "Abraham Silberschatz"],
+  ["CS105", "The C Programming Language", "Brian Kernighan"]
+];
+
+class Book {
+  constructor(id, title, author, issued = false) {
+    this.book_id = id; this.title = title; this.author = author; this.issued = issued;
+  }
+}
+
+class Library {
+  constructor() { this.books = new Map(); this.load(); }
+  load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+          data.forEach(b => this.books.set(b.book_id, new Book(b.book_id, b.title, b.author, !!b.issued)));
+          return;
+        }
+      }
+    } catch (e) {}
+    this.sample();
+  }
+  save() { try { localStorage.setItem(KEY, JSON.stringify([...this.books.values()])); } catch (e) {} }
+  sample() {
+    this.books.clear();
+    SAMPLE.forEach(([id, t, a]) => this.books.set(id, new Book(id, t, a)));
+    this.save();
+  }
+  add(id, title, author) {
+    id = id.trim(); title = title.trim(); author = author.trim();
+    if (!id || !title || !author) return [false, "All fields are required."];
+    if (this.books.has(id)) return [false, "A book with this ID already exists."];
+    this.books.set(id, new Book(id, title, author));
+    this.save();
+    return [true, `Book '${title}' added successfully.`];
+  }
+  issue(id) {
+    const b = this.books.get(id);
+    if (!b) return [false, "Book not found."];
+    if (b.issued) return [false, "This book is already issued."];
+    b.issued = true; this.save();
+    return [true, `Book '${b.title}' issued successfully.`];
+  }
+  giveBack(id) {
+    const b = this.books.get(id);
+    if (!b) return [false, "Book not found."];
+    if (!b.issued) return [false, "This book has not been issued."];
+    b.issued = false; this.save();
+    return [true, `Book '${b.title}' returned successfully.`];
+  }
+  search(kw, field, status) {
+    kw = kw.trim().toLowerCase();
+    return [...this.books.values()].filter(b => {
+      if (status === "available" && b.issued) return false;
+      if (status === "issued" && !b.issued) return false;
+      if (!kw) return true;
+      const t = b.title.toLowerCase(), a = b.author.toLowerCase(), i = b.book_id.toLowerCase();
+      if (field === "author") return a.includes(kw);
+      if (field === "all") return t.includes(kw) || a.includes(kw) || i.includes(kw);
+      return t.includes(kw);
+    });
+  }
+  report() {
+    const total = this.books.size;
+    const issued = [...this.books.values()].filter(b => b.issued).length;
+    return { total, issued, available: total - issued };
+  }
+}
+
+const lib = new Library();
+const $ = id => document.getElementById(id);
+let status = "all", flashId = null, timer;
+
+function toast(msg, err) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.toggle("error", !!err); t.classList.add("show");
+  clearTimeout(timer); timer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function render() {
+  const r = lib.report();
+  $("r-total").textContent = r.total;
+  $("r-avail").textContent = r.available;
+  $("r-issued").textContent = r.issued;
+
+  const list = lib.search($("q").value, $("field").value, status);
+  const body = $("rows");
+  body.textContent = "";
+  list.forEach(b => {
+    const tr = document.createElement("tr");
+    if (b.book_id === flashId) tr.className = "flash";
+    const cells = [["id", b.book_id], ["title", b.title], ["", b.author]];
+    cells.forEach(([cls, text]) => {
+      const td = document.createElement("td");
+      if (cls) td.className = cls;
+      td.textContent = text; tr.appendChild(td);
+    });
+    const st = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "pill " + (b.issued ? "warn" : "ok");
+    pill.textContent = b.issued ? "Issued" : "Available";
+    st.appendChild(pill); tr.appendChild(st);
+    const ac = document.createElement("td");
+    ac.className = "actions";
+    const btn = document.createElement("button");
+    btn.className = "act " + (b.issued ? "return" : "issue");
+    btn.textContent = b.issued ? "Return" : "Issue";
+    btn.dataset.id = b.book_id; btn.dataset.act = b.issued ? "return" : "issue";
+    ac.appendChild(btn); tr.appendChild(ac);
+    body.appendChild(tr);
+  });
+  flashId = null;
+  $("empty").hidden = list.length > 0;
+  $("count").textContent = `Showing ${list.length} of ${r.total} books`;
+}
+
+$("add-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const id = $("f-id").value;
+  const [ok, msg] = lib.add(id, $("f-title").value, $("f-author").value);
+  toast(msg, !ok);
+  if (ok) { flashId = id.trim(); e.target.reset(); $("f-id").focus(); status = "all"; syncTabs(); }
+  render();
+});
+
+$("rows").addEventListener("click", e => {
+  const b = e.target.closest("button[data-id]");
+  if (!b) return;
+  const [ok, msg] = b.dataset.act === "issue" ? lib.issue(b.dataset.id) : lib.giveBack(b.dataset.id);
+  toast(msg, !ok);
+  flashId = b.dataset.id;
+  render();
+});
+
+function syncTabs() {
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-pressed", String(t.dataset.s === status)));
+}
+$("tabs").addEventListener("click", e => {
+  const t = e.target.closest(".tab");
+  if (!t) return;
+  status = t.dataset.s; syncTabs(); render();
+});
+$("q").addEventListener("input", render);
+$("field").addEventListener("change", render);
+$("reset").addEventListener("click", () => { lib.sample(); toast("Library reset to the 5 sample books."); render(); });
+
+render();
+</script>
+
+</body></html>

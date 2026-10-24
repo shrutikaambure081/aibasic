@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Student Management System</title>
+  <style>
+    :root {
+      --bg: #f4f6fb; --card: #fff; --text: #1f2937; --muted: #6b7280;
+      --border: #e5e7eb; --primary: #4f46e5; --primary-dark: #4338ca;
+      --danger: #dc2626; --success: #16a34a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    .container { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+    header { text-align: center; margin-bottom: 20px; }
+    h1 { margin: 0; font-size: 1.8rem; }
+    .subtitle { margin: 4px 0 0; color: var(--muted); }
+    h2 { margin: 0 0 14px; font-size: 1.15rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+
+    form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
+    .field.grow { flex: 1; min-width: 180px; }
+    label { font-size: .8rem; font-weight: 600; color: var(--muted); }
+    input { padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: .95rem; outline: none; }
+    input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+    input:disabled { background: #f3f4f6; color: var(--muted); }
+
+    button { padding: 9px 16px; border: none; border-radius: 8px; font-size: .9rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .actions { display: flex; gap: 8px; }
+    .primary { background: var(--primary); color: #fff; }
+    .primary:hover { background: var(--primary-dark); }
+    .ghost { background: #eef0f5; color: var(--text); }
+    .ghost:hover { background: #e2e5ed; }
+    .edit-btn { background: #e0e7ff; color: var(--primary-dark); padding: 6px 12px; }
+    .edit-btn:hover { background: #c7d2fe; }
+    .delete-btn { background: #fee2e2; color: var(--danger); padding: 6px 12px; margin-left: 6px; }
+    .delete-btn:hover { background: #fecaca; }
+
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .toolbar h2 { margin: 0; }
+    .toolbar input { min-width: 230px; }
+    .badge { background: var(--primary); color: #fff; font-size: .75rem; padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+    .table-wrap { margin-top: 12px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+    th.right, td.right { text-align: right; cursor: default; }
+    tbody tr:hover { background: #f9fafb; }
+    tr.editing { background: #eef2ff; }
+    .grade-pill { background: #ecfdf5; color: var(--success); padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+    .empty { text-align: center; color: var(--muted); padding: 24px 0 8px; }
+
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 11px 20px; border-radius: 8px; color: #fff; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+    .hidden { display: none; }
+    @media (max-width: 560px) { .actions { width: 100%; } .actions button { flex: 1; } }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Student Management System</h1>
+      <p class="subtitle">Add, update, delete and search student records</p>
+    </header>
+
+    <section class="card">
+      <h2 id="form-title">Add student</h2>
+      <form id="student-form" autocomplete="off">
+        <div class="field">
+          <label for="id">ID</label>
+          <input id="id" placeholder="e.g. 101" required>
+        </div>
+        <div class="field grow">
+          <label for="name">Name</label>
+          <input id="name" placeholder="Full name" required>
+        </div>
+        <div class="field">
+          <label for="grade">Grade</label>
+          <input id="grade" placeholder="A+ ... F or 0-100" required>
+        </div>
+        <div class="actions">
+          <button type="submit" id="submit-btn" class="primary">Add</button>
+          <button type="button" id="cancel-btn" class="ghost hidden">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <h2>Students <span id="count" class="badge">0</span></h2>
+        <input id="search" type="search" placeholder="Search by ID or name...">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="id">ID <span class="arrow"></span></th>
+              <th data-sort="name">Name <span class="arrow"></span></th>
+              <th data-sort="grade">Grade <span class="arrow"></span></th>
+              <th class="right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p id="empty" class="empty hidden">No records found.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script>
+    // ---------- Student + StudentManager (mirrors the Python classes) ----------
+    const STORAGE_KEY = "students";
+    const LETTER_GRADES = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "F"];
+
+    class Student {
+      constructor(id, name, grade) {
+        this.id = id;
+        this.name = name;
+        this.grade = grade;
+      }
+    }
+
+    class StudentManager {
+      constructor() {
+        this.students = [];
+        this.load();
+      }
+
+      load() {
+        try {
+          const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+          this.students = data.map((s) => new Student(s.id, s.name, s.grade));
+        } catch {
+          this.students = [];
+        }
+      }
+
+      save() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.students)); } catch {}
+      }
+
+      find(id) { return this.students.find((s) => s.id === id); }
+
+      static validGrade(grade) {
+        if (LETTER_GRADES.includes(grade.toUpperCase())) return true;
+        const n = Number(grade);
+        return grade !== "" && !Number.isNaN(n) && n >= 0 && n <= 100;
+      }
+
+      static normalizeGrade(grade) {
+        return LETTER_GRADES.includes(grade.toUpperCase()) ? grade.toUpperCase() : grade;
+      }
+
+      add(id, name, grade) {
+        id = id.trim(); name = name.trim(); grade = grade.trim();
+        if (!id) return [false, "ID cannot be empty."];
+        if (this.find(id)) return [false, `ID '${id}' already exists.`];
+        if (!name) return [false, "Name cannot be empty."];
+        if (!StudentManager.validGrade(grade)) return [false, "Grade must be a letter (A+ to F) or a number 0-100."];
+        this.students.push(new Student(id, name, StudentManager.normalizeGrade(grade)));
+        this.save();
+        return [true, "Student added."];
+      }
+
+      update(id, name, grade) {
+        const s = this.find(id);
+        if (!s) return [false, `No student with ID '${id}'.`];
+        name = name.trim(); grade = grade.trim();
+        if (!name) return [false, "Name cannot be empty."];
+        if (!StudentManager.validGrade(grade)) return [false, "Grade must be a letter (A+ to F) or a number 0-100."];
+        s.name = name;
+        s.grade = StudentManager.normalizeGrade(grade);
+        this.save();
+        return [true, "Student updated."];
+      }
+
+      remove(id) {
+        if (!this.find(id)) return [false, `No student with ID '${id}'.`];
+        this.students = this.students.filter((s) => s.id !== id);
+        this.save();
+        return [true, "Student deleted."];
+      }
+    }
+
+    // ---------- UI ----------
+    const manager = new StudentManager();
+    const $ = (id) => document.getElementById(id);
+    const form = $("student-form"), idInput = $("id"), nameInput = $("name"), gradeInput = $("grade");
+    const submitBtn = $("submit-btn"), cancelBtn = $("cancel-btn"), formTitle = $("form-title");
+    const rowsEl = $("rows"), emptyEl = $("empty"), countEl = $("count"), searchEl = $("search"), toastEl = $("toast");
+
+    let editingId = null, sortKey = "id", sortAsc = true, toastTimer;
+
+    function toast(message, ok) {
+      toastEl.textContent = message;
+      toastEl.className = "toast " + (ok ? "success" : "error");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 2500);
+    }
+
+    function esc(text) {
+      const d = document.createElement("div");
+      d.textContent = text;
+      return d.innerHTML.replace(/"/g, "&quot;");
+    }
+
+    function render() {
+      const q = searchEl.value.trim().toLowerCase();
+      const visible = manager.students
+        .filter((s) => s.id.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))
+        .sort((a, b) => {
+          const r = String(a[sortKey]).localeCompare(String(b[sortKey]), undefined, { numeric: true });
+          return sortAsc ? r : -r;
+        });
+
+      rowsEl.innerHTML = visible.map((s) => `
+        <tr class="${s.id === editingId ? "editing" : ""}">
+          <td>${esc(s.id)}</td>
+          <td>${esc(s.name)}</td>
+          <td><span class="grade-pill">${esc(String(s.grade))}</span></td>
+          <td class="right">
+            <button class="edit-btn" data-edit="${esc(s.id)}">Edit</button>
+            <button class="delete-btn" data-delete="${esc(s.id)}">Delete</button>
+          </td>
+        </tr>`).join("");
+
+      countEl.textContent = manager.students.length;
+      emptyEl.classList.toggle("hidden", visible.length > 0);
+      document.querySelectorAll("th[data-sort]").forEach((th) => {
+        th.querySelector(".arrow").textContent = th.dataset.sort === sortKey ? (sortAsc ? "▲" : "▼") : "";
+      });
+    }
+
+    function startEdit(id) {
+      const s = manager.find(id);
+      if (!s) return;
+      editingId = id;
+      idInput.value = s.id;
+      idInput.disabled = true; // ID is the unique key
+      nameInput.value = s.name;
+      gradeInput.value = s.grade;
+      formTitle.textContent = "Update student " + id;
+      submitBtn.textContent = "Save changes";
+      cancelBtn.classList.remove("hidden");
+      nameInput.focus();
+      render();
+    }
+
+    function resetForm() {
+      editingId = null;
+      form.reset();
+      idInput.disabled = false;
+      formTitle.textContent = "Add student";
+      submitBtn.textContent = "Add";
+      cancelBtn.classList.add("hidden");
+      idInput.focus();
+      render();
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const [ok, msg] = editingId
+        ? manager.update(editingId, nameInput.value, gradeInput.value)
+        : manager.add(idInput.value, nameInput.value, gradeInput.value);
+      toast(msg, ok);
+      if (ok) resetForm();
+    });
+
+    cancelBtn.addEventListener("click", resetForm);
+    searchEl.addEventListener("input", render);
+
+    rowsEl.addEventListener("click", (e) => {
+      const { edit, delete: del } = e.target.dataset;
+      if (edit) startEdit(edit);
+      if (del && confirm(`Delete student '${del}'?`)) {
+        const [ok, msg] = manager.remove(del);
+        toast(msg, ok);
+        if (del === editingId) resetForm(); else render();
+      }
+    });
+
+    document.querySelectorAll("th[data-sort]").forEach((th) => {
+      th.addEventListener("click", () => {
+        sortAsc = sortKey === th.dataset.sort ? !sortAsc : true;
+        sortKey = th.dataset.sort;
+        render();
+      });
+    });
+
+    render();
+  </script>
+</body>
+</html>
