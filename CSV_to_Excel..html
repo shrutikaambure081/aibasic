@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CSV to Excel Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=DM+Sans:wght@400;500;600&family=DM+Mono&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f4f5f1;--card:#fff;--soft:#eaede6;--line:#d5dacf;--ink:#18261e;--mute:#58675d;--acc:#1b7a4b;--acc-ink:#fff;--accsoft:#d9eede;--warn:#8a5200;--warnsoft:#fbeccb;--bad:#b3261e;--badsoft:#fbe3e0;--hd:"Bricolage Grotesque",system-ui,sans-serif;--bd:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"DM Mono",ui-monospace,Consolas,monospace;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1713;--card:#17221c;--soft:#202d26;--line:#2f4036;--ink:#e6efe9;--mute:#9bb0a4;--acc:#4cc38a;--acc-ink:#06281a;--accsoft:#1b3a2b;--warn:#f0b85a;--warnsoft:#3a2d12;--bad:#ff9088;--badsoft:#3e1d1a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1713;--card:#17221c;--soft:#202d26;--line:#2f4036;--ink:#e6efe9;--mute:#9bb0a4;--acc:#4cc38a;--acc-ink:#06281a;--accsoft:#1b3a2b;--warn:#f0b85a;--warnsoft:#3a2d12;--bad:#ff9088;--badsoft:#3e1d1a;color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--bd);padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:1280px;margin:0 auto}
+h1,h2,h3{font-family:var(--hd);margin:0;letter-spacing:-.01em}
+button,input,select{font:inherit;color:inherit}:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;transition:transform .12s,border-color .12s}
+.btn:hover{border-color:var(--acc)}.btn:active{transform:scale(.97)}
+.btn.p{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}.btn.sm{padding:4px 10px;font-size:.85rem}.btn:disabled{opacity:.5;cursor:not-allowed}
+.mono{font-family:var(--mono);font-size:.84rem}
+/* stage 1 */
+#intro{min-height:calc(100vh - 60px);display:grid;place-items:center;padding:24px 0}
+.hero{width:100%;max-width:720px;text-align:center}
+.hero h1{font-size:clamp(2rem,6vw,3.2rem);line-height:1.05;text-wrap:balance}
+.hero p{color:var(--mute);margin:12px auto 24px;max-width:52ch}
+.drop{border:2px dashed var(--line);background:var(--card);border-radius:16px;padding:44px 20px;cursor:pointer;transition:all .15s;display:grid;gap:10px;justify-items:center}
+.drop:hover,.drop.over{border-color:var(--acc);background:var(--accsoft);transform:translateY(-2px)}
+.drop svg{width:44px;height:44px;stroke:var(--acc)}
+.drop b{font-family:var(--hd);font-size:1.25rem}
+.alt{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:16px}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:32px;text-align:left}
+.how div{padding:12px 14px;border-left:3px solid var(--acc);background:var(--card);border-radius:0 8px 8px 0}.how b{display:block}.how span{color:var(--mute);font-size:.85rem}
+#paste{display:none;margin-top:14px}#paste.open{display:block}
+#paste textarea{width:100%;min-height:120px;font-family:var(--mono);font-size:.82rem;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);margin-bottom:8px}
+/* stage 2 */
+#app{display:none;padding-top:18px}body.loaded #app{display:block}body.loaded #intro{display:none}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.bar h2{font-size:1.3rem}.bar .meta{color:var(--mute);font-size:.88rem}
+.steps{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.step{flex:1 1 150px;display:flex;gap:10px;align-items:center;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 12px;cursor:pointer;text-align:left}
+.step i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-weight:600;font-size:.85rem;flex:none}
+.step[aria-current=step]{border-color:var(--acc);box-shadow:inset 0 -3px 0 var(--acc)}.step[aria-current=step] i{background:var(--acc);color:var(--acc-ink)}
+.step.done i{background:var(--accsoft);color:var(--acc)}.step small{display:block;color:var(--mute);font-size:.76rem;line-height:1.2}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}.stat b{font-family:var(--hd);font-size:1.6rem;display:block;line-height:1.1}.stat span{color:var(--mute);font-size:.82rem}
+.stat.w{background:var(--warnsoft);border-color:transparent}.stat.w b,.stat.w span{color:var(--warn)}
+.main{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:18px;align-items:start}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.guide{background:var(--accsoft);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:.9rem}.guide b{display:block;font-family:var(--hd);font-size:1rem;margin-bottom:2px}
+.tips{margin:0 0 14px;padding:0;list-style:none;display:grid;gap:6px}.tips li{background:var(--warnsoft);color:var(--warn);border-radius:8px;padding:6px 10px;font-size:.85rem;display:flex;justify-content:space-between;gap:8px;align-items:center}.tips li.ok{background:var(--soft);color:var(--mute)}
+.tips button{border:0;background:var(--warn);color:var(--card);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.8rem;white-space:nowrap}
+.tg{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}.tg:last-of-type{border-bottom:0}
+.tg input{accent-color:var(--acc);margin-top:5px;width:16px;height:16px}.tg span{font-weight:500}.tg small{display:block;color:var(--mute);font-weight:400;font-size:.8rem}
+.fld{display:grid;gap:4px;margin-bottom:12px}.fld label{font-size:.82rem;color:var(--mute);font-weight:500}
+.fld input,.fld select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.pane{display:none}.pane.on{display:block}
+.cl{display:grid;gap:8px;max-height:440px;overflow:auto;padding-right:2px}
+.col{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:grid;grid-template-columns:auto 1fr 94px;gap:8px;align-items:center}.col.off{opacity:.5}
+.col input[type=text],.col select{width:100%;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);min-width:0}.col .info{grid-column:2/4;color:var(--mute);font-size:.78rem;font-family:var(--mono)}
+.col input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
+.fmt{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}.fmt label{border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;cursor:pointer;font-weight:500}.fmt input{position:absolute;opacity:0}.fmt label:has(input:checked){border-color:var(--acc);background:var(--accsoft);color:var(--acc)}.fmt label:has(input:focus-visible){outline:2px solid var(--acc)}
+.pv .tb{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;margin-bottom:10px}.pv input[type=search]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-width:200px;flex:1;max-width:320px}
+.sc{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:.85rem}th,td{padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+th{position:sticky;top:0;background:var(--soft);cursor:pointer;user-select:none;font-weight:600}th:hover{color:var(--acc)}th .ty{display:block;font-weight:400;font-size:.7rem;color:var(--mute);font-family:var(--mono)}
+td.n{text-align:right;font-family:var(--mono)}td.e{background:var(--warnsoft)}td.rn,th.rn{color:var(--mute);font-family:var(--mono);text-align:right;width:1%;cursor:default}
+.note{color:var(--mute);font-size:.8rem;margin-top:8px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;z-index:9;max-width:90vw}#toast.on{opacity:1;transform:translate(-50%,0)}
+.swatches{display:flex;gap:8px;align-items:center}.sw{width:26px;height:26px;border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0;transition:transform .12s}.sw:hover{transform:scale(1.12)}.sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--acc)}
+@media(max-width:860px){.main{grid-template-columns:1fr}.how{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.logw{margin-top:12px}.logw summary{cursor:pointer;font-weight:500}.logbox{max-height:160px;overflow:auto;background:var(--soft);border-radius:8px;padding:8px;margin:8px 0;white-space:pre-wrap;word-break:break-word;font-size:.75rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section id="intro">
+  <div class="hero">
+    <h1>Turn any CSV into a clean Excel file</h1>
+    <p>Everything happens in your browser, so your data never leaves this page. Add a file to unlock cleaning, column tools and export.</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a CSV file">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
+      <b>Drop your CSV here</b><span style="color:var(--mute)">or click to browse · .csv .tsv .txt</span>
+    </div>
+    <input type="file" id="file" accept=".csv,.tsv,.txt,text/csv" hidden>
+    <div class="alt"><button class="btn" id="pasteBtn">Paste CSV text</button><button class="btn" id="sampleBtn">Try a messy sample</button></div>
+    <div class="swatches" role="group" aria-label="Colour theme" style="justify-content:center;margin-top:16px"></div>
+    <div id="paste"><textarea id="pasteTx" placeholder="name,city&#10;Asha,Hubballi"></textarea><button class="btn p" id="pasteGo">Use this text</button></div>
+    <div class="how"><div><b>Clean</b><span>Trim spaces, drop blanks and duplicates</span></div><div><b>Shape</b><span>Rename, retype and hide columns</span></div><div><b>Export</b><span>Excel, CSV or JSON with auto-fit widths</span></div></div>
+  </div>
+</section>
+
+<main id="app">
+  <div class="bar"><div><h2 id="fname">file.csv</h2><div class="meta" id="fmeta"></div></div><div class="row" style="margin:0;align-items:center"><span class="swatches" role="group" aria-label="Colour theme"></span><button class="btn sm" id="reset">Reset changes</button><button class="btn sm" id="another">Load another file</button></div></div>
+  <div class="steps" id="steps"></div>
+  <div class="cards" id="cards"></div>
+  <div class="main">
+    <div class="panel">
+      <div class="guide" id="guide"></div>
+      <div class="pane" id="p1">
+        <ul class="tips" id="tips"></ul>
+        <label class="tg"><input type="checkbox" id="o_header"><span>First row is the header<small>Turn off if your file starts straight with data.</small></span></label>
+        <label class="tg"><input type="checkbox" id="o_trim"><span>Trim extra spaces<small>Removes spaces around every value.</small></span></label>
+        <label class="tg"><input type="checkbox" id="o_empty"><span>Remove empty rows</span></label>
+        <label class="tg"><input type="checkbox" id="o_dupe"><span>Remove duplicate rows<small>Keeps the first copy of each row.</small></span></label>
+        <label class="tg"><input type="checkbox" id="o_infer"><span>Detect numbers and dates<small>Leading zeros like 007 stay as text.</small></span></label>
+        <div class="fld" style="margin-top:10px"><label for="o_delim">Separator</label><select id="o_delim"><option value="">Auto-detect</option><option value=",">Comma</option><option value=";">Semicolon</option><option value="&#9;">Tab</option><option value="|">Pipe</option></select></div>
+        <div class="fld"><label for="o_enc">Text encoding</label><select id="o_enc"><option value="utf-8">UTF-8 (default)</option><option value="windows-1252">Windows-1252 (old Excel files)</option><option value="iso-8859-1">ISO-8859-1</option></select></div>
+        <div class="row"><button class="btn p" data-go="2">Next: columns</button></div>
+      </div>
+      <div class="pane" id="p2">
+        <div class="fld"><label for="o_case">Header style</label><select id="o_case"><option value="as">Keep as written</option><option value="title">Title Case</option><option value="snake">snake_case</option><option value="upper">UPPER CASE</option></select></div>
+        <div class="cl" id="cl"></div>
+        <div class="row"><button class="btn" data-go="1">Back</button><button class="btn p" data-go="3">Next: export</button></div>
+      </div>
+      <div class="pane" id="p3">
+        <div class="fmt" role="radiogroup" aria-label="Format"><label><input type="radio" name="fmt" value="xlsx" checked>Excel</label><label><input type="radio" name="fmt" value="csv">CSV</label><label><input type="radio" name="fmt" value="json">JSON</label></div>
+        <div class="fld"><label for="o_out">File name</label><input type="text" id="o_out"></div>
+        <div class="fld" id="shWrap"><label for="o_sheet">Sheet name</label><input type="text" id="o_sheet" maxlength="31" value="Sheet1"></div>
+        <div class="fld" id="dfWrap" style="display:none"><label for="o_datefmt">Date format in CSV</label><select id="o_datefmt"><option value="serial" selected>Date as number, e.g. 45366 (never shows ##)</option><option value="dd-mm-yy">15-03-24 (fits Excel's default width)</option><option value="dd/mm/yy">15/03/24</option><option value="dd-mmm-yy">15-Mar-24</option><option value="dd/mm/yyyy">15/03/2024</option><option value="yyyy-mm-dd">2024-03-15</option></select></div>
+        <label class="tg" id="dpWrap"><input type="checkbox" id="o_dprot" checked><span>Keep dates readable in Excel (no ###)<small>CSV only. Each date is written as text, exactly as in your file, so Excel cannot squeeze it. Untick for a plain CSV.</small></span></label>
+        <label class="tg" id="afWrap"><input type="checkbox" id="o_filter" checked><span>Add filter buttons to the header</span></label>
+        <label class="tg" id="awWrap"><input type="checkbox" id="o_width" checked><span>Auto-fit column widths</span></label>
+        <div class="row"><button class="btn" data-go="2">Back</button><button class="btn p" id="dl">Download file</button></div>
+        <div class="note" id="dlnote"></div>
+        <div class="note" id="serialNote" style="display:none"></div>
+        <div class="note">Dates keep the format they have in your file (for example 15/03/2024 stays 15/03/2024).</div>
+        <details class="logw"><summary>Activity log</summary><pre class="logbox mono" id="logbox">No activity yet.</pre><button class="btn sm" id="logDl">Download log (.txt)</button></details>
+      </div>
+    </div>
+    <div class="panel pv">
+      <div class="tb"><h3>Live preview</h3><input type="search" id="q" placeholder="Search rows" aria-label="Search rows"><span class="meta mono" id="pvmeta" style="color:var(--mute)"></span></div>
+      <div class="sc"><table id="tbl"></table></div>
+      <div class="note">Click a column heading to sort the preview. Shaded cells are empty. The preview shows the first 100 matches; the export includes every row.</div>
+    </div>
+  </div>
+</main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+var $=function(s){return document.querySelector(s)},$$=function(s){return [].slice.call(document.querySelectorAll(s))};
+var S={name:'',buf:null,text:'',step:1,cols:[],q:'',sort:null,o:{header:true,trim:true,empty:true,dupe:false,infer:true,delim:'',enc:'utf-8',hcase:'as'},B:null};
+var D=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(function(){t.classList.remove('on')},2600)}
+var LOGS=[];
+function log(level,msg){var t=new Date().toISOString().replace('T',' ').slice(0,19);LOGS.push(t+' ['+level+'] '+msg);if(LOGS.length>500)LOGS.shift();
+  (level==='ERROR'?console.error:level==='WARNING'?console.warn:console.log)('[CSV Studio] '+msg);
+  var b=$('#logbox');if(b){b.textContent=LOGS.join('\n');b.scrollTop=b.scrollHeight}}
+function done(fn,n){var m='Saved '+fn+' with '+n.toLocaleString()+' rows.';log('INFO',m);toast(m)}
+function stem(n){return n.replace(/\.[^.]+$/,'')||'data'}
+/* ---------- loading ---------- */
+function load(name,buf){
+  var bytes=new Uint8Array(buf||new ArrayBuffer(0));
+  if(!bytes.length){log('ERROR','"'+name+'" is empty (0 bytes).');toast('That file is empty. Choose another one.');return}
+  if(bytes[0]===0x50&&bytes[1]===0x4B){log('ERROR','"'+name+'" looks like an Excel or zip file, not a CSV.');toast('That looks like an Excel or zip file, not a CSV.');return}
+  if(!/\.(csv|tsv|txt)$/i.test(name))log('WARNING','Unusual file type for "'+name+'". Trying to read it as CSV.');
+  S.name=name;S.buf=buf;S.o.enc='utf-8';S.cols=[];S.q='';S.sort=null;S.step=1;$('#q').value='';
+  if(bytes[0]===0xFF&&bytes[1]===0xFE)S.o.enc='utf-16le';
+  try{
+    decode();
+    if(!S.text.trim())throw new Error('The file contains only blank space.');
+    if(S.o.enc==='utf-8'&&S.text.indexOf('\u0000')>-1)throw new Error('The file contains binary data, so it is probably not a text CSV.');
+    build();
+    if(!D.w)throw new Error('No columns were found in this file.');
+  }catch(e){var m=(e&&e.message)||'unknown error';log('ERROR','Could not open "'+name+'": '+m);toast('Could not open that file: '+m);return}
+  document.body.classList.add('loaded');$('#o_out').value=stem(name);syncUI();render();scrollTo(0,0);
+  log('INFO','Loaded "'+name+'": '+D.total+' rows, '+D.w+' columns, '+S.o.enc.toUpperCase()+'.');
+  D.errors.slice(0,5).forEach(function(e){log('WARNING','Parse problem'+(e.row!=null?' on line '+(e.row+1):'')+': '+e.message)});
+  if(D.errors.length>5)log('WARNING',(D.errors.length-5)+' more parse problems not listed.');
+  toast(D.errors.length?'Loaded '+name+' with '+D.errors.length+' problem'+(D.errors.length>1?'s':'')+'. See the warnings in step 1.':'Loaded '+name+'. Cleaning options are now unlocked.');
+}
+function decode(){try{S.text=new TextDecoder(S.o.enc).decode(S.buf)}catch(e){S.text=new TextDecoder('utf-8').decode(S.buf)}S.text=S.text.replace(/^\uFEFF/,'')}
+function readFile(f){if(!f)return;var r=new FileReader();r.onload=function(){load(f.name,r.result)};r.onerror=function(){log('ERROR','Could not read file "'+f.name+'": '+((r.error&&r.error.message)||'unknown error'));toast('Could not read that file. Try another one.')};r.readAsArrayBuffer(f)}
+var SAMPLE='id,customer,city,signup_date,amount,notes\n001,  Asha Rao ,Hubballi,2026-01-14,"$1,200.50",paid\n002,Vikram Shah,Pune,2026-02-03,980,pending\n\n002,Vikram Shah,Pune,2026-02-03,980,pending\n003,Meera Iyer ,Bengaluru,2026-02-19,"$2,450.00",\n004,  Rohan Das,Delhi,2026-03-07,310.75,paid\n005,Sana Khan,Mumbai,,1500,paid\n,,,,,\n006,Dev Patel,Ahmedabad,2026-04-22,"$75",refund\n';
+/* ---------- parsing & cleaning ---------- */
+function isNum(v){return /^[-+]?\(?[$₹€£]?\s?\d{1,3}(,\d{3})*(\.\d+)?\)?$|^[-+]?[$₹€£]?\s?\d+(\.\d+)?$/.test(v)&&!/^0\d/.test(v.replace(/^[-+$₹€£\s]/,''))}
+function toNum(v){var neg=/^\(.*\)$/.test(v)||/^-/.test(v);var n=parseFloat(v.replace(/[^\d.]/g,''));return isNaN(n)?null:(neg?-n:n)}
+function isDate(v){return /^\d{4}-\d{1,2}-\d{1,2}([ T][\d:]+)?$|^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4}$/.test(v)&&!isNaN(toDate(v))}
+function toDate(v){var m=v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);return m?new Date(Date.UTC(+m[3],+m[2]-1,+m[1])):new Date(/^\d{4}-\d{1,2}-\d{1,2}$/.test(v)?v+'T00:00:00Z':v)}
+function caseT(s,m){if(m==='title')return s.toLowerCase().replace(/(^|[\s_-])(\w)/g,function(a,b,c){return (b?' ':'')+c.toUpperCase()}).trim();if(m==='snake')return s.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');if(m==='upper')return s.toUpperCase();return s}
+function build(){
+  var o=S.o,p=Papa.parse(S.text,{delimiter:o.delim,skipEmptyLines:false}),raw=p.data;
+  if(raw.length&&raw[raw.length-1].length===1&&raw[raw.length-1][0]==='')raw.pop();
+  var w=raw.reduce(function(a,r){return Math.max(a,r.length)},0),total=raw.length;
+  raw=raw.map(function(r){var x=r.map(function(c){return o.trim?String(c).trim():String(c)});while(x.length<w)x.push('');return x});
+  var hdr=o.header&&raw.length?raw[0]:null,body=hdr?raw.slice(1):raw,nEmpty=0,nDupe=0,blanks=0;
+  body.forEach(function(r){if(r.every(function(c){return c===''}))blanks++});
+  if(o.empty)body=body.filter(function(r){return !r.every(function(c){return c===''})});
+  var dupesAll=0,seen={},seen2={};body.forEach(function(r){var k=JSON.stringify(r);if(seen2[k])dupesAll++;seen2[k]=1});
+  if(o.dupe)body=body.filter(function(r){var k=JSON.stringify(r);if(seen[k]){nDupe++;return false}seen[k]=1;return true});
+  if(S.cols.length!==w)S.cols=[];
+  for(var i=0;i<w;i++){var c=S.cols[i]||(S.cols[i]={name:null,type:'auto',inc:true});c.orig=(hdr&&hdr[i])||('Column '+(i+1));
+    var vals=body.map(function(r){return r[i]}).filter(function(v){return v!==''});
+    c.empty=body.length-vals.length;var u={};vals.forEach(function(v){u[v]=1});c.uniq=Object.keys(u).length;
+    var lead0=vals.some(function(v){return /^0\d/.test(v)});
+    c.auto='text';if(o.infer&&vals.length&&!lead0){if(vals.every(isNum))c.auto='number';else if(vals.every(isDate))c.auto='date'}}
+  D={body:body,w:w,total:total,blanks:blanks,dupes:dupesAll,removedDupes:nDupe,hasHeader:!!hdr,delim:p.meta.delimiter,errors:(p.errors||[]).filter(function(e){return e.code!=='UndetectableDelimiter'})};
+}
+function cname(i){var c=S.cols[i];return c.name!=null?c.name:caseT(c.orig,S.o.hcase)}
+function ctype(i){var c=S.cols[i];return c.type==='auto'?c.auto:c.type}
+function conv(v,t){if(v==='')return null;if(t==='number'){var n=toNum(v);return n==null?v:n}if(t==='date'){var d=toDate(v);return isNaN(d)?v:d}return v}
+function outCols(){var used={},res=[];S.cols.forEach(function(c,i){if(!c.inc)return;var n=cname(i)||('Column '+(i+1)),b=n,k=2;while(used[n])n=b+'_'+(k++);used[n]=1;res.push({i:i,name:n,type:ctype(i)})});return res}
+function outRows(raw){var cs=outCols();return D.body.map(function(r){return cs.map(function(c){return raw&&c.type==='date'&&r[c.i]!==''?r[c.i]:conv(r[c.i],c.type)})})}
+function dateFmt(v){var m=v.match(/^(\d{1,2})([\/.-])(\d{1,2})\2(\d{4})$/);if(m)return (m[1].length===1?'d':'dd')+m[2]+(m[3].length===1?'m':'mm')+m[2]+'yyyy';return /[ T]\d/.test(v)?'yyyy-mm-dd hh:mm:ss':'yyyy-mm-dd'}
+/* ---------- render ---------- */
+var GUIDE={1:['Step 1 · Clean up your data','Review the warnings below and tick the options that fit. The preview on the right updates instantly.'],2:['Step 2 · Shape your columns','Rename headings, untick columns you do not need, and set Text, Number or Date where auto-detect guessed wrong.'],3:['Step 3 · Export','Pick a format, name your file and download. Excel gives you real numbers and dates, so sums and sorting work.']};
+function syncUI(){var o=S.o;$('#o_header').checked=o.header;$('#o_trim').checked=o.trim;$('#o_empty').checked=o.empty;$('#o_dupe').checked=o.dupe;$('#o_infer').checked=o.infer;$('#o_delim').value=o.delim;$('#o_enc').value=o.enc;$('#o_case').value=o.hcase}
+function render(){renderTop();renderTips();renderCols();renderPreview();renderExportOpts()}
+function renderTop(){
+  $('#fname').textContent=S.name;$('#fmeta').textContent=(D.delim==='\t'?'Tab':D.delim==='|'?'Pipe':D.delim===';'?'Semicolon':'Comma')+' separated · '+S.o.enc.toUpperCase();
+  var names=['Clean up','Columns','Export'],hint=['Fix messy rows','Rename and retype','Download'];
+  $('#steps').innerHTML=names.map(function(n,k){var s=k+1;return '<button class="step'+(S.step>s?' done':'')+'" data-go="'+s+'"'+(S.step===s?' aria-current="step"':'')+'><i>'+(S.step>s?'✓':s)+'</i><span>'+n+'<small>'+hint[k]+'</small></span></button>'}).join('');
+  var oc=outCols();
+  $('#cards').innerHTML=[['Rows kept',D.body.length],['Columns',oc.length+'/'+D.w],['Empty rows',D.blanks,D.blanks&&!S.o.empty],['Duplicates',D.dupes,D.dupes&&!S.o.dupe],['Empty cells',S.cols.reduce(function(a,c){return a+(c.inc?c.empty:0)},0)]].map(function(x){return '<div class="stat'+(x[2]?' w':'')+'"><b>'+(typeof x[1]==='number'?x[1].toLocaleString():x[1])+'</b><span>'+x[0]+'</span></div>'}).join('');
+  $('#guide').innerHTML='<b>'+GUIDE[S.step][0]+'</b>'+GUIDE[S.step][1];
+  [1,2,3].forEach(function(s){$('#p'+s).classList.toggle('on',S.step===s)});
+}
+function renderTips(){
+  var t=[];
+  if(D.blanks&&!S.o.empty)t.push(['Found '+D.blanks+' empty row'+(D.blanks>1?'s':''),'empty']);
+  if(D.dupes&&!S.o.dupe)t.push(['Found '+D.dupes+' duplicate row'+(D.dupes>1?'s':''),'dupe']);
+  if(!S.o.trim)t.push(['Spaces around values may break sorting','trim']);
+  if(S.o.header&&S.cols.some(function(c,i){return /^Column \d+$/.test(c.orig)}))t.push(['Some headings are blank and were named for you',null]);
+  if(D.w===1&&S.text.indexOf(';')>-1)t.push(['Only one column found. Try another separator','sep']);
+  if(S.o.enc==='utf-8'&&S.text.indexOf('\uFFFD')>-1)t.push(['Odd symbols found. Try Windows-1252 encoding','enc']);
+  D.errors.slice(0,3).forEach(function(e){t.push([(e.row!=null?'Line '+(e.row+1)+': ':'')+e.message,null])});
+  if(D.errors.length>3)t.push(['And '+(D.errors.length-3)+' more problems in the file',null]);
+  $('#tips').innerHTML=t.length?t.map(function(x){return '<li><span>'+esc(x[0])+'</span>'+(x[1]?'<button data-fix="'+x[1]+'">Fix</button>':'')+'</li>'}).join(''):'<li class="ok">No problems found. Your data looks tidy.</li>';
+}
+function renderCols(){
+  $('#cl').innerHTML=S.cols.map(function(c,i){return '<div class="col'+(c.inc?'':' off')+'"><input type="checkbox" data-i="'+i+'" data-k="inc"'+(c.inc?' checked':'')+' aria-label="Include column"><input type="text" data-i="'+i+'" data-k="name" value="'+esc(cname(i))+'" aria-label="Column name"><select data-i="'+i+'" data-k="type" aria-label="Column type"><option value="auto"'+(c.type==='auto'?' selected':'')+'>Auto ('+c.auto+')</option><option value="text"'+(c.type==='text'?' selected':'')+'>Text</option><option value="number"'+(c.type==='number'?' selected':'')+'>Number</option><option value="date"'+(c.type==='date'?' selected':'')+'>Date</option></select><div class="info">'+c.uniq+' unique · '+c.empty+' empty</div></div>'}).join('');
+}
+function fmtCell(v,t){if(v==null)return '';if(v instanceof Date)return v.toISOString().slice(0,10);return String(v)}
+function renderPreview(){
+  var cs=outCols(),rows=outRows(),q=S.q.toLowerCase();
+  if(q)rows=rows.filter(function(r){return r.some(function(v){return fmtCell(v).toLowerCase().indexOf(q)>-1})});
+  if(S.sort&&S.sort.i<cs.length){var k=S.sort.i,d=S.sort.d;rows=rows.slice().sort(function(a,b){var x=a[k],y=b[k];if(x==null)return 1;if(y==null)return -1;return (x>y?1:x<y?-1:0)*d})}
+  var shown=rows.slice(0,100);
+  $('#pvmeta').textContent=rows.length.toLocaleString()+' row'+(rows.length===1?'':'s');
+  $('#tbl').innerHTML='<thead><tr><th class="rn">#</th>'+cs.map(function(c,k){return '<th data-s="'+k+'">'+esc(c.name)+(S.sort&&S.sort.i===k?(S.sort.d>0?' ▲':' ▼'):'')+'<span class="ty">'+c.type+'</span></th>'}).join('')+'</tr></thead><tbody>'+
+    (shown.length?shown.map(function(r,n){return '<tr><td class="rn">'+(n+1)+'</td>'+r.map(function(v,k){return '<td class="'+(v==null?'e':(typeof v==='number'?'n':''))+'">'+esc(fmtCell(v))+'</td>'}).join('')+'</tr>'}).join(''):'<tr><td colspan="'+(cs.length+1)+'" style="text-align:center;color:var(--mute);padding:24px">No rows match. Clear the search to see everything.</td></tr>')+'</tbody>';
+}
+function renderExportOpts(){var f=$('input[name=fmt]:checked').value;$('#shWrap').style.display=$('#afWrap').style.display=$('#awWrap').style.display=f==='xlsx'?'':'none';$('#dfWrap').style.display='none';$('#dpWrap').style.display=f==='csv'?'':'none';$('#serialNote').style.display='none';$('#dl').textContent='Download .'+f}
+/* ---------- export ---------- */
+function csvDate(d){var y=d.getUTCFullYear(),m=d.getUTCMonth(),dd=d.getUTCDate(),p=function(n){return (n<10?'0':'')+n},M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],f=($('#o_datefmt')||{}).value||'serial';
+  if(f==='serial')return String(Math.round((d.getTime()/86400000+25569)*100000)/100000);
+  return f==='dd-mm-yy'?p(dd)+'-'+p(m+1)+'-'+String(y).slice(2):f==='dd/mm/yy'?p(dd)+'/'+p(m+1)+'/'+String(y).slice(2):f==='dd-mmm-yy'?p(dd)+'-'+M[m]+'-'+String(y).slice(2):f==='dd/mm/yyyy'?p(dd)+'/'+p(m+1)+'/'+y:y+'-'+p(m+1)+'-'+p(dd)}
+function esc2(v,prot){v=v instanceof Date?csvDate(v):fmtCell(v);if(prot&&v!=='')v='="'+v+'"';return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function fail(e){log('ERROR','Export failed: '+((e&&(e.message||e.code))||String(e)));$('#dlnote').textContent='Could not save the file: '+((e&&(e.message||e.code))||String(e))+(e&&e.code?' ('+e.code+')':'');toast('Download failed. See the note under the button.')}
+async function download(){try{await download2()}catch(e){fail(e)}}
+async function download2(){$('#dlnote').textContent='';if(typeof XLSX==='undefined'&&$('input[name=fmt]:checked').value==='xlsx')throw new Error('The Excel library did not load. Check your connection and reload, or export CSV instead.');
+  var f=$('input[name=fmt]:checked').value,cs=outCols(),rows=outRows(),base=($('#o_out').value||'data').replace(/[\\/:*?"<>|]+/g,'_'),data,fn=base+'.'+f;
+  if(!cs.length){toast('Select at least one column first.');return}
+  if(f==='xlsx'){
+    var ws=XLSX.utils.aoa_to_sheet([cs.map(function(c){return c.name})].concat(rows),{cellDates:true});
+    if($('#o_width').checked)ws['!cols']=cs.map(function(c,k){var m=c.name.length;rows.forEach(function(r){m=Math.max(m,fmtCell(r[k]).length)});return {wch:Math.min(Math.max(m+2,8),60)}});
+    if(!ws['!cols'])ws['!cols']=cs.map(function(){return {wch:9}});
+    cs.forEach(function(c,k){if(c.type==='date')ws['!cols'][k]={wch:Math.max((ws['!cols'][k]||{}).wch||0,14)}});
+    if($('#o_filter').checked&&rows.length)ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:cs.length-1}})};
+    var dfm=cs.map(function(c){if(c.type!=='date')return null;var f=D.body.map(function(r){return r[c.i]}).filter(function(v){return v!==''})[0];return f?dateFmt(f):'yyyy-mm-dd'});
+    Object.keys(ws).forEach(function(a){if(ws[a]&&ws[a].t==='d'){var k=XLSX.utils.decode_cell(a).c;ws[a].z=dfm[k]||'yyyy-mm-dd'}});
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,($('#o_sheet').value||'Sheet1').replace(/[\\\/?*\[\]:]/g,'_').slice(0,31));
+    data=new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array',cellDates:true})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }else if(f==='csv'){data='\uFEFF'+[cs.map(function(c){return esc2(c.name)}).join(',')].concat(outRows(true).map(function(r){return r.map(function(v,k){return esc2(v,cs[k].type==='date'&&$('#o_dprot').checked)}).join(',')})).join('\r\n')}
+  else{data=JSON.stringify(outRows(true).map(function(r){var o={};cs.forEach(function(c,k){o[c.name]=r[k] instanceof Date?r[k].toISOString().slice(0,10):r[k]});return o}),null,2)}
+  try{
+    var inClaude=!!(window.claude&&window.claude.use),dl=null;
+    if(inClaude){try{dl=await window.claude.use('downloads')}catch(_){dl=null}}
+    if(dl){await dl.save({filename:fn,data:data});done(fn,rows.length);return}
+    var blob=data instanceof Blob?data:new Blob([data],{type:f==='csv'?'text/csv;charset=utf-8':'application/json'});
+    if(navigator.msSaveOrOpenBlob){navigator.msSaveOrOpenBlob(blob,fn)}
+    else{var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=fn;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(u)},1500)}
+    done(fn,rows.length);
+  }catch(e){if(e&&e.code==='declined'){log('INFO','Download cancelled by user.');toast('Download cancelled.')}else fail(e)}
+}
+/* ---------- events ---------- */
+function go(s){S.step=s;renderTop();scrollTo({top:0,behavior:'smooth'})}
+function opts(){var o=S.o;o.header=$('#o_header').checked;o.trim=$('#o_trim').checked;o.empty=$('#o_empty').checked;o.dupe=$('#o_dupe').checked;o.infer=$('#o_infer').checked;o.delim=$('#o_delim').value;o.hcase=$('#o_case').value;
+  if(o.enc!==$('#o_enc').value){o.enc=$('#o_enc').value;decode()}build();render();log('INFO','Options changed: '+D.body.length+' rows kept, '+D.blanks+' empty and '+D.dupes+' duplicate rows found.')}
+var drop=$('#drop');
+function pick(){$('#file').click()}
+drop.addEventListener('click',pick);drop.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}});
+$('#file').addEventListener('change',function(e){readFile(e.target.files[0]);e.target.value=''});
+['dragenter','dragover'].forEach(function(n){window.addEventListener(n,function(e){e.preventDefault();drop.classList.add('over')})});
+['dragleave','drop'].forEach(function(n){window.addEventListener(n,function(e){e.preventDefault();if(n==='drop'||e.target===document.documentElement)drop.classList.remove('over');if(n==='drop'&&e.dataTransfer.files.length)readFile(e.dataTransfer.files[0])})});
+$('#pasteBtn').onclick=function(){$('#paste').classList.toggle('open');$('#pasteTx').focus()};
+$('#pasteGo').onclick=function(){var t=$('#pasteTx').value;if(!t.trim()){toast('Paste some CSV text first.');return}load('pasted.csv',new TextEncoder().encode(t).buffer)};
+$('#sampleBtn').onclick=function(){load('sample-customers.csv',new TextEncoder().encode(SAMPLE).buffer)};
+$('#another').onclick=function(){document.body.classList.remove('loaded')};
+$('#reset').onclick=function(){S.cols=[];S.q='';S.sort=null;$('#q').value='';S.o={header:true,trim:true,empty:true,dupe:false,infer:true,delim:'',enc:S.o.enc,hcase:'as'};syncUI();build();render();toast('Back to the original settings.')};
+['o_header','o_trim','o_empty','o_dupe','o_infer','o_delim','o_enc','o_case'].forEach(function(id){$('#'+id).addEventListener('change',function(){if(id==='o_case')S.cols.forEach(function(c){c.name=null});opts()})});
+document.addEventListener('click',function(e){
+  var g=e.target.closest('[data-go]');if(g){go(+g.dataset.go);return}
+  var fx=e.target.closest('[data-fix]');if(fx){var k=fx.dataset.fix;if(k==='empty')$('#o_empty').checked=true;if(k==='dupe')$('#o_dupe').checked=true;if(k==='trim')$('#o_trim').checked=true;if(k==='sep')$('#o_delim').value=';';if(k==='enc')$('#o_enc').value='windows-1252';opts();toast('Fixed.');return}
+  var th=e.target.closest('th[data-s]');if(th){var i=+th.dataset.s;S.sort=S.sort&&S.sort.i===i?(S.sort.d>0?{i:i,d:-1}:null):{i:i,d:1};renderPreview()}
+});
+$('#cl').addEventListener('input',function(e){var t=e.target;if(t.dataset.k==='name'){S.cols[+t.dataset.i].name=t.value;renderPreview()}});
+$('#cl').addEventListener('change',function(e){var t=e.target,c=S.cols[+t.dataset.i];if(!c)return;if(t.dataset.k==='inc')c.inc=t.checked;if(t.dataset.k==='type')c.type=t.value;renderTop();renderCols();renderPreview()});
+$('#q').addEventListener('input',function(e){S.q=e.target.value;renderPreview()});
+$$('input[name=fmt]').forEach(function(r){r.addEventListener('change',renderExportOpts)});
+$('#dl').onclick=download;
+$('#logDl').onclick=function(){var b=new Blob([LOGS.join('\r\n')||'No activity yet.'],{type:'text/plain;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='csv-to-excel-log.txt';a.style.display='none';document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(u)},1500)};
+var TH={indigo:['Indigo',['#4338ca','#e0e0fa','#f5f5fb','#e8e8f3','#d6d6e8'],['#9a9bf7','#2a2b57','#101120','#181a30','#222440','#33365c']],rose:['Rose',['#be185d','#fbdbe9','#fbf4f6','#f3e6eb','#e6d3db'],['#f472a8','#4a1c33','#1a0f14','#251820','#31202a','#4a2f3d']],orange:['Orange',['#c2410c','#fde3d3','#fbf6f2','#f3e9e1','#e5d6ca'],['#fb923c','#4a2610','#1a120c','#251a13','#31241b','#4a372a']],teal:['Teal',['#0f766e','#d3f0ec','#f2f8f7','#e3efed','#cfe1de'],['#2dd4bf','#10403b','#0c1716','#142221','#1c2f2d','#2a4542']],green:['Green',null,null]};
+function theme(k){var r=document.documentElement.style,t=TH[k],dk=window.matchMedia('(prefers-color-scheme: dark)').matches;
+  ['--acc','--accsoft','--bg','--card','--soft','--line','--acc-ink'].forEach(function(v){r.removeProperty(v)});
+  if(t[1]){var a=dk?t[2]:t[1];r.setProperty('--acc',a[0]);r.setProperty('--accsoft',a[1]);r.setProperty('--bg',a[2]);if(dk){r.setProperty('--card',a[3]);r.setProperty('--soft',a[4]);r.setProperty('--line',a[5]);r.setProperty('--acc-ink','#0d0d14')}else{r.setProperty('--soft',a[3]);r.setProperty('--line',a[4]);r.setProperty('--acc-ink','#ffffff')}}
+  $$('.sw').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.t===k))});
+  try{localStorage.setItem('c2e-theme',k)}catch(e){}}
+$$('.swatches').forEach(function(box){box.innerHTML=Object.keys(TH).map(function(k){var c=TH[k][1]?TH[k][1][0]:'#1b7a4b';return '<button class="sw" data-t="'+k+'" style="background:'+c+'" aria-label="'+TH[k][0]+' theme" title="'+TH[k][0]+'"></button>'}).join('');box.addEventListener('click',function(e){var b=e.target.closest('.sw');if(b){theme(b.dataset.t);toast(TH[b.dataset.t][0]+' theme applied.')}})});
+var saved='indigo';try{saved=localStorage.getItem('c2e-theme')||'indigo'}catch(e){}
+theme(TH[saved]?saved:'indigo');
+})();
+</script>
+</body>
+</html>
