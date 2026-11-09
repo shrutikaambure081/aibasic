@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Personal Expense Tracker</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--tx:#1d2433;--mu:#667085;--bd:#dde2ec;--ac:#2f5597;--ok:#2e9e5b;--bad:#d9534f;--wn:#d99a00}
+@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b202b;--tx:#e8ecf4;--mu:#98a2b3;--bd:#2c3446;--ac:#6b9bff;--ok:#4cc38a;--bad:#ff7b72;--wn:#f2c94c}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--tx)}
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+nav{background:var(--card);border-right:1px solid var(--bd);padding:16px 12px}
+nav h1{font-size:15px;letter-spacing:.5px;margin:0 8px 14px;color:var(--ac)}
+nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--tx);padding:8px 10px;border-radius:8px;font:inherit;cursor:pointer}
+nav button:hover{background:var(--bg)}nav button.on{background:var(--ac);color:#fff}
+main{padding:22px;max-width:960px;width:100%}h2{margin:0 0 14px}h3{margin:22px 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+form.card,.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+label{display:flex;flex-direction:column;font-size:12px;color:var(--mu);gap:4px;flex:1 1 150px}
+input,select{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+button.p,button.s{font:inherit;padding:9px 16px;border-radius:8px;border:1px solid var(--ac);cursor:pointer}
+button.p{background:var(--ac);color:#fff}button.s{background:none;color:var(--ac)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:7px 9px;border-bottom:1px solid var(--bd);text-align:left}
+th{color:var(--mu);font-size:12px;text-transform:uppercase}td.r,th.r{text-align:right}.wrap{overflow-x:auto}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--bd)}.kv:last-child{border:0}
+.pb{height:12px;background:var(--bd);border-radius:6px;overflow:hidden;min-width:90px}.pb i{display:block;height:100%;background:var(--ac)}
+.warn,.alert,.good{padding:10px 14px;border-radius:8px;margin:10px 0;font-weight:600}
+.warn{background:#d99a0026;color:var(--wn)}.alert{background:#d9534f26;color:var(--bad)}.good{background:#2e9e5b26;color:var(--ok)}
+.in{color:var(--ok)}.ex{color:var(--bad)}.mu{color:var(--mu)}canvas{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin:8px 0}
+.x{background:none;border:0;color:var(--bad);cursor:pointer}
+@media(max-width:760px){.app{grid-template-columns:1fr}nav{border:0;border-bottom:1px solid var(--bd)}nav div{display:grid;grid-template-columns:1fr 1fr}}
+</style></head><body>
+<div class="app"><nav><h1>💰 PERSONAL EXPENSE TRACKER</h1><div id="menu"></div></nav><main id="main"></main></div>
+<script>
+const CE=["Food","Travel","Shopping","Education","Bills","Entertainment","Healthcare","Others"],
+CI=["Salary","Business","Freelance","Investment","Gift","Others"],CUR="$";
+const K={t:"et_transactions",b:"et_budgets",g:"et_goals"};
+const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}};
+let tx=ld(K.t,[]),bud=ld(K.b,{}),goal=ld(K.g,null),cur="income";
+function save(){try{localStorage.setItem(K.t,JSON.stringify(tx));localStorage.setItem(K.b,JSON.stringify(bud));localStorage.setItem(K.g,JSON.stringify(goal))}catch(e){}}
+const $=id=>document.getElementById(id),
+today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10),
+thisMonth=()=>today().slice(0,7),
+m$=v=>(v<0?"-":"")+CUR+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}),
+esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])),
+pb=p=>`<div class="pb"><i style="width:${Math.min(Math.max(p,0),100)}%;${p>=100?"background:var(--bad)":p>=80?"background:var(--wn)":""}"></i></div>`;
+/* ---------- calculations ---------- */
+const sum=(t,m)=>tx.filter(x=>x.type==t&&(!m||x.date.startsWith(m))).reduce((a,x)=>a+x.amount,0);
+function cats(m){const o={};tx.filter(x=>x.type=="Expense"&&(!m||x.date.startsWith(m))).forEach(x=>o[x.category]=(o[x.category]||0)+x.amount);return Object.entries(o).sort((a,b)=>b[1]-a[1])}
+function months(){const s={};tx.forEach(x=>s[x.date.slice(0,7)]=1);return Object.keys(s).sort()}
+const pc=(o,n)=>o==0?null:(n-o)/o*100;
+function chg(o,n){const c=pc(o,n);if(c===null)return n?"N/A (no spending before)":"No change";if(Math.abs(c)<.05)return"= 0.0% (no change)";return c>0?`▲ ${c.toFixed(1)}% (increased)`:`▼ ${Math.abs(c).toFixed(1)}% (decreased)`}
+function bstat(m){const b=bud[m];if(b==null)return null;const s=sum("Expense",m);return{m,b,s,rem:b-s,p:s/b*100}}
+function bw(s){if(!s)return"";if(s.p>=100)return`<div class="alert">🚨 ALERT: ${s.p.toFixed(1)}% of the budget is used${s.rem<0?" — over by "+m$(-s.rem):""}!</div>`;if(s.p>=80)return`<div class="warn">⚠️ WARNING: ${s.p.toFixed(1)}% of the budget used — only ${m$(s.rem)} left.</div>`;return""}
+function goalInfo(sv){if(!goal)return null;return{...goal,p:Math.max(sv,0)/goal.target*100,rem:Math.max(goal.target-sv,0)}}
+function summary(m){const inc=sum("Income",m),exp=sum("Expense",m),sv=tx.filter(x=>x.date.slice(0,7)<=m).reduce((a,x)=>a+(x.type=="Income"?x.amount:-x.amount),0),c=cats(m);
+return{m,inc,exp,bal:inc-exp,sv,c,top:c[0],b:bstat(m),g:goalInfo(sv)}}
+function kv(a,b){return`<div class="kv"><span>${a}</span><b>${b}</b></div>`}
+function sumHtml(s){let h=kv("Total Income",m$(s.inc))+kv("Total Expenses",m$(s.exp))+kv("Remaining Balance <small class=mu>(income − expenses)</small>",m$(s.bal))+kv("Total Savings <small class=mu>(all income − all expenses to date)</small>",m$(s.sv))+kv("Highest Expense Category",s.top?`${s.top[0]} (${m$(s.top[1])})`:"—");
+h+=s.b?kv("Monthly Budget",m$(s.b.b))+kv("Budget Utilization",`${s.b.p.toFixed(1)}%`)+pb(s.b.p)+kv("Remaining Budget",m$(s.b.rem))+bw(s.b):kv("Budget","not set for this month");
+h+=s.g?kv("Savings Goal",`${esc(s.g.name)} — ${m$(s.g.target)}`)+kv("Goal Progress",s.g.p.toFixed(1)+"%")+pb(s.g.p)+kv("Still Needed",m$(s.g.rem)):kv("Savings Goal","not set");return h}
+/* ---------- helpers: tables, downloads ---------- */
+function tbl(rows,del){return`<div class="wrap"><table><tr><th>ID<th>Date<th>Type<th>Category<th class=r>Amount<th>Description${del?"<th>":""}</tr>${rows.map(x=>`<tr><td>${x.id}<td>${x.date}<td>${x.type}<td>${x.category}<td class="r ${x.type=="Income"?"in":"ex"}">${m$(x.amount)}<td>${esc(x.description)}${del?`<td><button class=x title=Delete onclick="del(${x.id})">✕</button>`:""}</tr>`).join("")||'<tr><td colspan=7 class=mu>No records found.</tr>'}</table></div>`}
+function dl(name,text,type="text/plain"){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
+const csv=r=>r.map(x=>x.map(v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':v).join(",")).join("\n");
+function parseCsv(t){const r=[];let row=[],f="",q=false;for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c=='"'&&t[i+1]=='"'){f+='"';i++}else if(c=='"')q=false;else f+=c}else if(c=='"')q=true;else if(c==","){row.push(f);f=""}else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;row.push(f);f="";if(row.some(v=>v!==""))r.push(row);row=[]}else f+=c}row.push(f);if(row.some(v=>v!==""))r.push(row);return r}
+const txRows=()=>[["id","date","type","amount","category","description"],...[...tx].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).map(x=>[x.id,x.date,x.type,x.amount,x.category,x.description])];
+const ws=(n,r)=>`<Worksheet ss:Name="${n}"><Table>${r.map(x=>`<Row>${x.map(v=>`<Cell><Data ss:Type="${typeof v=="number"?"Number":"String"}">${esc(v)}</Data></Cell>`).join("")}</Row>`).join("")}</Table></Worksheet>`;
+const book=s=>`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${s}</Workbook>`;
+function monthRows(){let p=null;return months().map(m=>{const i=sum("Income",m),e=sum("Expense",m),c=p===null?"-":chg(p,e);p=e;return[m,i,e,i-e,c]})}
+/* ---------- views ---------- */
+const V={
+income:()=>form("Income"),expense:()=>form("Expense"),
+tx:()=>{$("main").innerHTML=`<h2>View & Search Transactions</h2><div class="card row">
+<label>Keyword<input id=fq oninput=tv()></label><label>Type<select id=ft onchange=tv()><option value="">All<option>Income<option>Expense</select></label>
+<label>Category<select id=fc onchange=tv()><option value="">Any${[...new Set([...CE,...CI])].map(c=>`<option>${c}`).join("")}</select></label>
+<label>From<input type=date id=ff onchange=tv()></label><label>To<input type=date id=fe onchange=tv()></label>
+<label>Min amount<input type=number id=fa oninput=tv()></label><label>Max amount<input type=number id=fb oninput=tv()></label></div><div id=res></div>`;tv()},
+budget:()=>{$("main").innerHTML=`<h2>Set Monthly Budget</h2><form class=card onsubmit="return setB(event)"><label>Month<input type=month id=bm value="${thisMonth()}" required></label><label>Budget amount<input type=number id=ba step=.01 min=.01 required></label><button class=p>Save budget</button></form><div id=bo></div>`;showB(thisMonth())},
+summary:()=>{$("main").innerHTML=`<h2>Monthly Summary</h2><div class=card><label>Month<input type=month id=sm value="${thisMonth()}" onchange=drawS()></label></div><div class=card id=so></div><div id=sc></div>`;drawS()},
+compare:()=>{const mm=months();$("main").innerHTML=`<h2>Monthly Spending Comparison</h2><div class="card wrap">${mm.length?`<table><tr><th>Month<th class=r>Income<th class=r>Expenses<th class=r>Savings<th>Expense change vs previous month</tr>${monthRows().map(r=>`<tr><td>${r[0]}<td class=r>${m$(r[1])}<td class=r>${m$(r[2])}<td class=r>${m$(r[3])}<td>${r[4]}</tr>`).join("")}</table>`:'<span class=mu>No data yet.</span>'}</div>
+${mm.length>1?`<h3>Compare two months</h3><div class="card row"><label>First<select id=c1>${mm.map(m=>`<option>${m}`)}</select></label><label>Second<select id=c2>${mm.map((m,i)=>`<option ${i==mm.length-1?"selected":""}>${m}`)}</select></label><button class=p onclick=cmp()>Compare</button></div><div id=co></div>`:""}`;},
+top:()=>{$("main").innerHTML=`<h2>Highest Expense Category</h2><div class="card row"><label>Month<input type=month id=tm value="${thisMonth()}" onchange=drawT()></label><label style="flex:0 0 auto;flex-direction:row;align-items:center"><input type=checkbox id=ta onchange=drawT()> All time</label></div><div class=card id=to></div>`;drawT()},
+savings:()=>{const i=sum("Income"),e=sum("Expense"),sv=i-e,g=goalInfo(sv);$("main").innerHTML=`<h2>Savings Calculator</h2><div class=card>${kv("Total Income",m$(i))+kv("Total Expenses",m$(e))+kv("Total Savings <small class=mu>(income − expenses)</small>",m$(sv))}</div>
+<div class=card><h3 style="margin-top:0">Savings goal</h3>${g?kv("Goal",`${esc(g.name)} — ${m$(g.target)}`)+kv("Progress",g.p.toFixed(1)+"%")+pb(g.p)+kv("Still needed",m$(g.rem))+(g.rem==0?'<div class=good>🎉 Goal reached!</div>':""):'<p class=mu>No goal set yet.</p>'}
+<form class=row onsubmit="return setG(event)" style="margin-top:12px"><label>Goal name<input id=gn maxlength=50 placeholder="e.g. New Laptop"></label><label>Target amount<input type=number id=gt step=.01 min=.01 required></label><button class=p>Save goal</button></form></div>`},
+charts:()=>{$("main").innerHTML=`<h2>Charts</h2>${tx.length?`<div class="card row"><label>Pie chart month (blank = all time)<input type=month id=pm onchange=drawC()></label></div><div id=ch></div>`:'<div class=card>Add some transactions first.</div>'}`;if(tx.length)drawC()},
+export:()=>{$("main").innerHTML=`<h2>Export Reports</h2><div class=card><div class=row>
+<button class=p onclick="dl('transactions.csv',csv(txRows()),'text/csv')">Export transactions.csv</button>
+<button class=s onclick="dl('budgets.csv',csv([['month','budget'],...Object.entries(bud)]),'text/csv')">budgets.csv</button>
+<button class=s onclick="dl('goals.csv',csv([['goal_name','target_amount'],...(goal?[[goal.name,goal.target]]:[])]),'text/csv')">goals.csv</button></div></div>
+<div class=card><button class=p onclick=xls()>Export Excel report (.xls)</button><p class=mu>Sheets: Transactions, Monthly Summary, Category Spending.</p></div>
+<div class=card><div class=row><label>Monthly report<input type=month id=rm value="${thisMonth()}"></label><button class=p onclick=rep()>Generate monthly report</button></div></div>
+<div class=card><label>Import transactions.csv (adds records, keeps existing)<input type=file accept=".csv" onchange=imp(this)></label></div><div id=eo></div>`},
+exit:()=>{save();$("main").innerHTML=`<div class=card><h2>Goodbye! 👋</h2><p>Your data is saved in this browser (localStorage). Use <b>Export Reports</b> to keep CSV backups.</p></div>`}};
+const MENU=[["income","Add Income"],["expense","Add Expense"],["tx","View / Search Transactions"],["budget","Set Monthly Budget"],["summary","Monthly Summary"],["compare","Monthly Spending Comparison"],["top","Highest Expense Category"],["savings","Savings Calculator"],["charts","View Charts"],["export","Export Reports"],["exit","Exit"]];
+function go(k){cur=k;V[k]();document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.k==k))}
+$("menu").innerHTML=MENU.map(([k,l],i)=>`<button data-k="${k}" onclick="go('${k}')">${i+1}. ${l}</button>`).join("");
+/* ---------- actions ---------- */
+function form(t){const C=t=="Income"?CI:CE;$("main").innerHTML=`<h2>Add ${t}</h2><form class=card onsubmit="return addTx(event,'${t}')"><label>Date<input type=date id=d value="${today()}" max="${today()}" required></label><label>Amount<input type=number id=a step=.01 min=.01 required></label><label>Category<select id=c>${C.map(o=>`<option>${o}`).join("")}</select></label><label>Description<input id=n maxlength=100></label><button class=p>Save ${t}</button></form><div id=msg></div><h3>Recent ${t.toLowerCase()} records</h3>${tbl(tx.filter(x=>x.type==t).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).slice(0,8),true)}`}
+function addTx(e,t){e.preventDefault();const d=$("d").value,a=parseFloat($("a").value),msg=$("msg");
+const bad=!/^\d{4}-\d{2}-\d{2}$/.test(d)||isNaN(Date.parse(d))?"Invalid date.":d>today()?"Date cannot be in the future.":d<"2000-01-01"?"Year must be 2000 or later.":!isFinite(a)||a<=0?"Amount must be greater than zero.":a>1e9?"Amount is too large.":"";
+if(bad){msg.innerHTML=`<div class=alert>✗ ${bad}</div>`;return false}
+const r={id:Math.max(0,...tx.map(x=>x.id))+1,date:d,type:t,amount:Math.round(a*100)/100,category:$("c").value,description:$("n").value.trim()||"-"};tx.push(r);save();
+const w=t=="Expense"?bw(bstat(d.slice(0,7))):"";form(t);$("msg").innerHTML=`<div class=good>✓ ${t} saved: ${m$(r.amount)} · ${r.category} · ${d}</div>`+w;return false}
+function del(id){if(confirm("Delete this record?")){tx=tx.filter(x=>x.id!=id);save();go(cur)}}
+function tv(){const q=$("fq").value.toLowerCase(),t=$("ft").value,c=$("fc").value,f=$("ff").value,e=$("fe").value,mn=parseFloat($("fa").value),mx=parseFloat($("fb").value);
+const r=tx.filter(x=>(!q||x.description.toLowerCase().includes(q)||x.category.toLowerCase().includes(q))&&(!t||x.type==t)&&(!c||x.category==c)&&(!f||x.date>=f)&&(!e||x.date<=e)&&(isNaN(mn)||x.amount>=mn)&&(isNaN(mx)||x.amount<=mx)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+$("res").innerHTML=`<p class=mu>${r.length} record(s) · Income <b class=in>${m$(r.filter(x=>x.type=="Income").reduce((a,x)=>a+x.amount,0))}</b> · Expenses <b class=ex>${m$(r.filter(x=>x.type=="Expense").reduce((a,x)=>a+x.amount,0))}</b></p><div class=card>${tbl(r,true)}</div>`}
+function showB(m){const s=bstat(m);$("bo").innerHTML=s?`<div class=card>${kv("Month",m)+kv("Monthly Budget",m$(s.b))+kv("Total Spent",m$(s.s))+kv(s.rem>=0?"Remaining Budget":"Over Budget By",m$(Math.abs(s.rem)))+kv("Budget Utilization",s.p.toFixed(1)+"%")+pb(s.p)}${bw(s)}</div>`:""}
+function setB(e){e.preventDefault();const m=$("bm").value,a=parseFloat($("ba").value);if(!m||!isFinite(a)||a<=0)return false;bud[m]=Math.round(a*100)/100;save();showB(m);return false}
+function setG(e){e.preventDefault();const t=parseFloat($("gt").value);if(!isFinite(t)||t<=0)return false;goal={name:$("gn").value.trim()||"My Savings Goal",target:Math.round(t*100)/100};save();V.savings();return false}
+function drawS(){const m=$("sm").value||thisMonth(),s=summary(m);$("so").innerHTML=sumHtml(s);$("sc").innerHTML=s.c.length?`<h3>Category-wise spending</h3><div class=card>${catHtml(s.c)}</div>`:""}
+function catHtml(c){const t=c.reduce((a,x)=>a+x[1],0);return`<table>${c.map(([n,v])=>`<tr><td>${n}<td class=r>${m$(v)}<td class=r>${(v/t*100).toFixed(1)}%<td style="width:35%">${pb(v/t*100)}</tr>`).join("")}</table>`}
+function drawT(){const all=$("ta").checked,m=all?"":$("tm").value,c=cats(m);$("to").innerHTML=c.length?`${catHtml(c)}<div class=good style="margin-top:12px">★ Highest spending category (${m||"all time"}): ${c[0][0]} — ${m$(c[0][1])}</div>`:'<span class=mu>No expenses found for that period.</span>'}
+function cmp(){const a=$("c1").value,b=$("c2").value,A=[sum("Income",a),sum("Expense",a)],B=[sum("Income",b),sum("Expense",b)],d=B[1]-A[1];
+$("co").innerHTML=`<div class="card wrap"><table><tr><th><th class=r>${a}<th class=r>${b}<th>Change</tr>${[["Income",0],["Expenses",1]].map(([n,i])=>`<tr><td>${n}<td class=r>${m$(A[i])}<td class=r>${m$(B[i])}<td>${chg(A[i],B[i])}</tr>`).join("")}<tr><td>Savings<td class=r>${m$(A[0]-A[1])}<td class=r>${m$(B[0]-B[1])}<td>${A[0]-A[1]>0?chg(A[0]-A[1],B[0]-B[1]):"N/A"}</tr></table>${d?`<p>You spent <b>${m$(Math.abs(d))}</b> ${d>0?"more":"less"} in ${b} than in ${a}.</p>`:""}</div>`}
+/* ---------- charts (canvas, saved as PNG) ---------- */
+const PAL=["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948","#b07aa1","#9c755f"];
+function cv(){const W=680,H=360,c=document.createElement("canvas");c.width=W*2;c.height=H*2;c.style.width="100%";c.style.maxWidth=W+"px";const x=c.getContext("2d");x.scale(2,2);const s=getComputedStyle(document.body),cs=getComputedStyle(document.documentElement);
+x.fillStyle=cs.getPropertyValue("--card");x.fillRect(0,0,W,H);x.font="12px system-ui,sans-serif";x.fillStyle=s.color;return{c,x,W,H,fg:s.color,bd:cs.getPropertyValue("--bd")}}
+function frame(o,max,labels,title){const{x,W,H}=o,L=64,B=H-44,T=40,R=W-20;x.textAlign="center";x.font="bold 14px system-ui,sans-serif";x.fillText(title,W/2,22);x.font="12px system-ui,sans-serif";
+for(let i=0;i<=4;i++){const y=B-(B-T)*i/4;x.strokeStyle=o.bd;x.beginPath();x.moveTo(L,y);x.lineTo(R,y);x.stroke();x.textAlign="right";x.fillText(Math.round(max*i/4).toLocaleString(),L-6,y+4)}
+x.textAlign="center";labels.forEach((l,i)=>x.fillText(l,L+(R-L)*(i+.5)/labels.length,B+16));return{L,B,T,R,n:labels.length,y:v=>B-(B-T)*v/max}}
+function legend(o,items){let px=70;items.forEach(([n,col])=>{o.x.fillStyle=col;o.x.fillRect(px,o.H-14,10,10);o.x.fillStyle=o.fg;o.x.textAlign="left";o.x.fillText(n,px+14,o.H-5);px+=90})}
+function pie(m){const o=cv(),c=cats(m),t=c.reduce((a,x)=>a+x[1],0),{x}=o;x.font="bold 14px system-ui,sans-serif";x.textAlign="center";x.fillText(`Category-wise Expenses (${m||"All time"})`,o.W/2,22);
+if(!t){x.fillText("No expenses",o.W/2,o.H/2);return o}let a=-Math.PI/2;c.forEach(([n,v],i)=>{const e=a+v/t*2*Math.PI;x.fillStyle=PAL[i%8];x.beginPath();x.moveTo(200,200);x.arc(200,200,130,a,e);x.fill();a=e;
+x.fillRect(380,70+i*28,12,12);x.fillStyle=o.fg;x.textAlign="left";x.font="12px system-ui,sans-serif";x.fillText(`${n}  ${(v/t*100).toFixed(1)}%  (${m$(v)})`,400,81+i*28)});return o}
+function bars(){const o=cv(),mm=months(),mx=Math.max(1,...mm.map(m=>Math.max(sum("Income",m),sum("Expense",m))))*1.1,f=frame(o,mx,mm,"Monthly Income vs Expenses"),w=(f.R-f.L)/f.n;
+mm.forEach((m,i)=>{[["Income","#2e9e5b"],["Expense","#d9534f"]].forEach(([t,col],j)=>{const v=sum(t,m);o.x.fillStyle=col;o.x.fillRect(f.L+w*i+w*.12+j*w*.38,f.y(v),w*.36,f.B-f.y(v))})});legend(o,[["Income","#2e9e5b"],["Expenses","#d9534f"]]);return o}
+function line(){const o=cv(),mm=months(),ev=mm.map(m=>sum("Expense",m)),mx=Math.max(1,...ev,...mm.map(m=>bud[m]||0))*1.15,f=frame(o,mx,mm,"Monthly Spending Trend"),w=(f.R-f.L)/f.n,x=o.x;
+const draw=(vals,col,dash)=>{x.strokeStyle=col;x.fillStyle=col;x.setLineDash(dash);x.lineWidth=2;x.beginPath();let st=false;vals.forEach((v,i)=>{if(v==null)return;const px=f.L+w*(i+.5);st?x.lineTo(px,f.y(v)):x.moveTo(px,f.y(v));st=true});x.stroke();x.setLineDash([]);vals.forEach((v,i)=>{if(v==null)return;const px=f.L+w*(i+.5);x.beginPath();x.arc(px,f.y(v),4,0,7);x.fill()})};
+draw(mm.map(m=>bud[m]??null),"#4e79a7",[6,4]);draw(ev,"#d9534f",[]);x.fillStyle=o.fg;x.textAlign="center";ev.forEach((v,i)=>x.fillText(Math.round(v).toLocaleString(),f.L+w*(i+.5),f.y(v)-10));legend(o,[["Expenses","#d9534f"],["Budget","#4e79a7"]]);return o}
+function drawC(){const h=$("ch");h.innerHTML="";[["category_pie.png",pie($("pm").value)],["monthly_income_vs_expenses.png",bars()],["monthly_spending_trend.png",line()]].forEach(([n,o])=>{const d=document.createElement("div");d.append(o.c);const b=document.createElement("button");b.className="s";b.textContent="⬇ Save PNG";b.onclick=()=>{const a=document.createElement("a");a.href=o.c.toDataURL("image/png");a.download=n;a.click()};d.append(b);h.append(d)})}
+/* ---------- exports ---------- */
+function xls(){if(!tx.length){$("eo").innerHTML="<div class=alert>No transactions to export.</div>";return}
+const t=cats("").reduce((a,x)=>a+x[1],0)||1;dl("expense_report.xls",book(ws("Transactions",txRows())+ws("Monthly Summary",[["Month","Income","Expenses","Savings","Expense Change","Budget","Budget Used %"],...monthRows().map(r=>[...r,bud[r[0]]??"Not set",bud[r[0]]?Math.round(r[2]/bud[r[0]]*1000)/10:"-"])])+ws("Category Spending",[["Category","Total Spent","Share %"],...cats("").map(([n,v])=>[n,v,Math.round(v/t*1000)/10])])),"application/vnd.ms-excel")}
+function rep(){const m=$("rm").value||thisMonth(),s=summary(m),L=["PERSONAL EXPENSE TRACKER - MONTHLY REPORT","Generated: "+new Date().toLocaleString(),"=".repeat(50),"",
+"Month: "+m,"Total Income: "+m$(s.inc),"Total Expenses: "+m$(s.exp),"Remaining Balance: "+m$(s.bal),"Total Savings: "+m$(s.sv),"Highest Category: "+(s.top?s.top[0]+" ("+m$(s.top[1])+")":"none"),
+"Budget: "+(s.b?m$(s.b.b)+" | used "+s.b.p.toFixed(1)+"% | remaining "+m$(s.b.rem):"not set"),"Savings goal: "+(s.g?s.g.name+" "+m$(s.g.target)+" | progress "+s.g.p.toFixed(1)+"%":"not set"),"","Category spending:",...s.c.map(([n,v])=>"  "+n.padEnd(14)+m$(v)),"","Transactions:",...tx.filter(x=>x.date.startsWith(m)).sort((a,b)=>a.date.localeCompare(b.date)).map(x=>`  ${x.date} ${x.type.padEnd(8)} ${x.category.padEnd(14)} ${m$(x.amount)}  ${x.description}`)];
+dl(`monthly_report_${m}.txt`,L.join("\n"));$("eo").innerHTML=`<div class=card><pre style="white-space:pre-wrap;margin:0">${esc(L.join("\n"))}</pre></div>`}
+function imp(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{let n=0,bad=0;parseCsv(String(r.result)).slice(1).forEach(c=>{const a=parseFloat(c[3]);if(/^\d{4}-\d{2}-\d{2}$/.test(c[1])&&c[1]<=today()&&["Income","Expense"].includes(c[2])&&a>0&&isFinite(a)){tx.push({id:Math.max(0,...tx.map(x=>x.id))+1,date:c[1],type:c[2],amount:a,category:c[4]||"Others",description:c[5]||"-"});n++}else bad++});save();$("eo").innerHTML=`<div class=good>Imported ${n} record(s)${bad?`, skipped ${bad} invalid row(s)`:""}.</div>`};r.readAsText(f)}
+go("income");
+</script></body></html>
